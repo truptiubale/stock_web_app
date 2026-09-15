@@ -1,0 +1,117 @@
+# Stock Market App — Prediction & Portfolio Logic
+
+This document explains the *thinking*, not the code: how historical analysis, AI prediction, and portfolio management will each work, and how they feed into each other.
+
+---
+
+## 1. How Historical Trend Analysis Will Work
+
+Historical analysis doesn't predict anything by itself — it just turns raw price data into signals that are easier to read than a wall of numbers. This has two layers: (1A) finding *which sector/stock* is worth looking at at all, and (1B) the core per-stock math everything else builds on.
+
+### 1A. Sector & Stock Screening — Finding What's Worth Looking At
+
+Before analyzing any single stock, the app needs to answer: **which sector is strong right now, and which stock in it is leading?** This is done systematically, not by gut feel:
+
+- Which sector is trending up, and which stock in it holds the strongest position?
+- What does financial/business news say is driving it?
+- What do technical analysis (charts/indicators) and fundamental analysis (company financials) both say?
+- How has the broader index behaved recently?
+- What do SEBI reports/filings show — broken down point by point rather than skimmed?
+- *Why* is the stock moving — is there a real reason, and does it have room to keep going?
+- Who holds large positions in the company, and is that ownership backing its growth?
+- When did the current move technically start, on the chart?
+- How has this sector performed over the last 5 years — is this a real trend or noise?
+
+This becomes an automated **market screening & sector rotation pipeline** for Indian indices (NSE/BSE), run as a daily job:
+
+**Step 1 — Global sentiment filter (runs first, sets the day's bias)**
+Pull overnight closes for global benchmarks (S&P 500, Nasdaq, Dow, GIFT Nifty, major Asian/European indices).
+- Net-negative close globally → run the **Bearish/Short bias pipeline**
+- Net-positive close globally → run the **Bullish/Long bias pipeline**
+
+**Step 2 — Indian sector & index ranking**
+Pull daily performance for three index buckets: major indices (Nifty 50, Nifty Next 50, Sensex), primary sector indices (Bank, IT, Auto, Pharma, FMCG, Metal), and thematic indices (Energy, Infra, PSE). Rank by % change:
+- Bearish bias → top 3 biggest losers
+- Bullish bias → top 3 biggest gainers
+
+**Step 3 — Multi-timeframe trend alignment**
+For each shortlisted index, pull OHLCV data across Monthly, Weekly, and Daily timeframes.
+- **Monthly and Weekly must agree with each other** — this is the real, established trend. If they disagree, the index is dropped and the next-ranked one is checked instead.
+- **Daily is allowed to go against Monthly/Weekly** — that's not a failure. A daily move opposite the higher-timeframe trend is treated as a pullback/mean-reversion moment, which is exactly what the daily RSI 40/60 trigger in Step 4 is designed to catch (e.g. daily dipping toward 40 while Monthly/Weekly are bullish = a potential entry point within the uptrend, not a rejection).
+
+**Step 4 — Indicator validation** (only for indices that passed Step 3)
+- **RSI (14-period, 40/60 bands):** Monthly & Weekly RSI confirm the higher-timeframe trend (>60 bullish, <40 bearish). Daily RSI is checked for the mean-reversion trigger — approaching/rejecting 60 (short setup) or approaching/rebounding from 40 (long setup).
+- **Bollinger Bands (20, 2):** flags volatility squeezes, band-walking (strong trend continuation), and mean-rejections (exhaustion).
+- **Volume confirmation:** today's volume must exceed the 20-day volume SMA — without this, a move isn't backed by real conviction and is treated as noise.
+
+**Output of this stage:** a daily table — index name, global bias, Monthly/Weekly/Daily RSI, Bollinger Band status, and a final verdict of "validated trending sector" or "rejected." This table is what feeds into 1B below and eventually into the prediction model as one of its inputs.
+
+### 1B. Core Per-Stock Calculations
+
+**Core calculations:**
+
+- **Moving Average (MA):** the average price over the last N days (e.g. 20-day MA). Smooths out daily noise so you can see the underlying trend. If today's price is above the 20-day MA, the trend is generally "up"; below it, "down."
+- **Daily Return:** how much the price changed from yesterday to today, as a percentage. This is the basic building block for almost everything else, including the ML model.
+- **Volatility:** how much the daily returns swing around, measured statistically (standard deviation of returns). High volatility = risky/unpredictable stock; low volatility = steadier stock.
+
+**What this module produces:** a table of "features" per stock per day — price, MA, return, volatility — that both the dashboard charts AND the prediction model will consume.
+
+This is why `analysis.py` sits in the middle of the backend: the prediction model doesn't work directly on raw prices, it works on these derived features.
+
+---
+
+## 2. How the AI Prediction Will Work
+
+Be clear-eyed about what "AI prediction" means here: it will estimate a **probability/direction** (e.g. "60% chance tomorrow is up") based on patterns in past data. It will NOT reliably predict exact future prices — no model can, and any product that claims it can is overselling. Markets are heavily influenced by news, sentiment, and events that aren't in your price data at all.
+
+**The pipeline:**
+
+1. **Input features** (from the analysis module): recent returns, moving averages, volatility, maybe volume.
+2. **Target**: what you're trying to predict — usually "will tomorrow's closing price be higher or lower than today's" (a yes/no classification), which is more honest and more achievable than predicting an exact price.
+3. **Model, starting simple:**
+   - Start with **Logistic Regression** (predicts up/down) or **Linear Regression** (predicts a number) — simple, fast, and lets you sanity-check whether your features contain any signal at all.
+   - Only move to something heavier (Random Forest, LSTM) if the simple model shows the pipeline works end-to-end. Jumping straight to a complex model before your simple baseline works just hides bugs.
+4. **Evaluation, done honestly:** split historical data into "train" (model learns from this) and "test" (model has never seen this — you check accuracy here). If you only check accuracy on data the model trained on, the numbers will look great and mean nothing.
+5. **Output:** a predicted direction + a confidence score, shown alongside the historical chart — not as a standalone "buy/sell" signal.
+
+**Realistic expectation:** for individual stock direction, accuracy meaningfully above 55-60% on unseen data is already a strong result. If your model shows 90%+ accuracy on test data, that's very likely a bug (data leakage — future information accidentally leaking into the training features), not a good model.
+
+---
+
+## 3. Portfolio Management Logic
+
+This part is pure bookkeeping — no ML involved, so it's the most reliable part of the app.
+
+**What's stored per trade:**
+- Ticker
+- Buy date
+- Buy price
+- Quantity
+- (Optional) sell date + sell price, once you exit
+
+**What's calculated from that:**
+- **Current value** = quantity × current live price (from `data_fetcher.py`)
+- **Invested amount** = quantity × buy price
+- **Unrealized P&L** = current value − invested amount (for holdings you still own)
+- **Realized P&L** = sell price − buy price, for positions you've closed
+- **Portfolio total** = sum across all holdings
+
+**How predictions relate to the portfolio (important boundary):** the prediction module and the portfolio module stay separate. The dashboard can show "AAPL: you hold 10 shares, up 4% (₹X profit) — model predicts 58% chance of rising tomorrow" side by side, but the app never auto-acts on the prediction. You read both and decide. This keeps the ML experimentation from ever risking real money by accident.
+
+---
+
+## 4. How All Three Connect — End to End
+
+```
+Raw historical prices (data_fetcher)
+        |
+        v
+Analysis module: MA, returns, volatility  ---->  Charts on dashboard
+        |
+        v
+Prediction module: features -> model -> direction + confidence  ---->  Prediction panel on dashboard
+        
+Portfolio module: your trades + live prices -> P&L  ---->  Portfolio panel on dashboard
+```
+
+Analysis feeds Prediction. Portfolio is independent of both, and only needs live prices. All three land on the same dashboard as separate panels — they inform each other visually (you, the human, connect the dots), but the code stays decoupled so a bug in the prediction model can never corrupt your portfolio numbers.
