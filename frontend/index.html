@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Screener — Stock Market App</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">SCREENER</div>
+    <div class="bias-indicator" id="biasIndicator">
+      <span class="bias-label">Global bias</span>
+      <span class="bias-value" id="biasValue">—</span>
+    </div>
+    <button class="refresh-btn" id="refreshBtn">Run screen</button>
+  </header>
+
+  <main>
+    <div class="status-row" id="statusRow">Click "Run screen" to fetch today's data.</div>
+
+    <table class="screener-table">
+      <thead>
+        <tr>
+          <th>Sector</th>
+          <th>% Change</th>
+          <th>Timeframe aligned</th>
+          <th>RSI (14)</th>
+          <th>Bollinger status</th>
+          <th>Volume confirmed</th>
+          <th>Verdict</th>
+        </tr>
+      </thead>
+      <tbody id="resultsBody">
+      </tbody>
+    </table>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,135 @@
+:root {
+  --bg: #0B1220;
+  --panel: #121B2E;
+  --border: #223049;
+  --text: #DCE3EE;
+  --text-muted: #7C8AA3;
+  --accent: #E8A33D;
+  --bullish: #3FB68C;
+  --bearish: #E0575B;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 18px 28px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+
+.bias-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.bias-label {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.bias-value {
+  font-family: var(--font-mono);
+  padding: 3px 10px;
+  border-radius: 3px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.bias-value.bullish { color: var(--bullish); border-color: var(--bullish); }
+.bias-value.bearish { color: var(--bearish); border-color: var(--bearish); }
+
+.refresh-btn {
+  background: var(--accent);
+  color: #1A1200;
+  border: none;
+  padding: 9px 18px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.refresh-btn:hover { filter: brightness(1.08); }
+.refresh-btn:disabled { opacity: 0.5; cursor: default; }
+
+main {
+  padding: 24px 28px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.status-row {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-bottom: 16px;
+  min-height: 18px;
+}
+
+.screener-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+.screener-table th,
+.screener-table td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.screener-table th {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: none;
+}
+
+.screener-table td.numeric {
+  font-family: var(--font-mono);
+  text-align: right;
+}
+
+.pct-positive { color: var(--bullish); }
+.pct-negative { color: var(--bearish); }
+
+.verdict-pill {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+
+.verdict-validated_trending_sector { color: var(--bullish); border-color: var(--bullish); }
+.verdict-rejected_timeframe_conflict { color: var(--bearish); border-color: var(--bearish); }
+.verdict-trend_aligned_low_conviction { color: var(--accent); border-color: var(--accent); }
+.verdict-insufficient_data { color: var(--text-muted); }
+
+.bool-true { color: var(--bullish); }
+.bool-false { color: var(--text-muted); }
